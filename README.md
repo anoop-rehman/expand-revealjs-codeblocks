@@ -10,9 +10,11 @@ When printing Quarto reveal.js slides (Ctrl+P or Cmd+P), scrollable code snippet
 
 The `fix_print_code_blocks.py` script automatically adds CSS rules to the `@media print` section of HTML files to ensure all code content is visible when printing.
 
+**Important:** The script keeps all files in `inputs/` untouched. It copies HTML files and their associated `_files` folders to the `outputs/` directory, then applies the fixes to the copied files.
+
 ## Usage
 
-### Fix all HTML files in inputs folder
+### Fix all HTML files
 
 ```bash
 python3 scripts/fix_print_code_blocks.py
@@ -20,9 +22,10 @@ python3 scripts/fix_print_code_blocks.py
 
 The script will:
 - Find all `.htm` and `.html` files in the `inputs/` directory
-- Create backup files (`.bak`) before making changes
+- Copy HTML files to the `outputs/` directory
+- Copy associated `_files` folders (containing CSS, JS, and other assets) to `outputs/`
 - Add print CSS fixes to ensure code blocks are fully visible
-- Skip files that have already been fixed
+- Keep all original files in `inputs/` untouched
 
 ### What gets fixed
 
@@ -47,7 +50,7 @@ lectures/
 ├── inputs/              # Source HTML files (Quarto reveal.js slides)
 │   ├── lecture-*.htm    # Lecture slide files
 │   └── lecture-*_files/ # Associated assets (CSS, JS, etc.)
-├── outputs/             # Output directory
+├── outputs/             # Output directory (fixed HTML files and _files folders)
 ├── scripts/             # Utility scripts
 │   └── fix_print_code_blocks.py
 └── README.md           # This file
@@ -55,10 +58,12 @@ lectures/
 
 ## Notes
 
-- Backup files (`.bak`) are created automatically before modifications
+- **Input files are never modified** - all changes are made to copies in `outputs/`
+- The script copies both HTML files and their associated `_files` folders to maintain styling
 - The script is idempotent - running it multiple times is safe
-- Files that have already been fixed will be skipped
+- Files that have already been fixed will still be copied to outputs
 - The script preserves all existing CSS rules and only adds the print fixes
+- Use the files in `outputs/` for printing - they have the fixes applied
 
 ## Requirements
 

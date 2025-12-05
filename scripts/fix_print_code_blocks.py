@@ -3,14 +3,18 @@
 Fix print CSS for Quarto reveal.js slides to ensure scrollable code snippets
 are fully visible when printing (Ctrl+P).
 
-This script adds CSS rules to the @media print section to:
-- Remove overflow restrictions on code blocks
-- Ensure all code content is visible when printing
-- Prevent code blocks from being cut off
+This script:
+- Reads HTML files from the inputs/ directory (keeps them untouched)
+- Copies HTML files and associated _files folders to outputs/ directory
+- Adds CSS rules to the @media print section to:
+  - Remove overflow restrictions on code blocks
+  - Ensure all code content is visible when printing
+  - Prevent code blocks from being cut off
 """
 
 import re
 import os
+import shutil
 from pathlib import Path
 
 
@@ -68,45 +72,72 @@ def fix_print_css(html_content):
     return html_content
 
 
-def process_html_file(file_path):
+def copy_files_folder(input_file_path, output_file_path):
     """
-    Process a single HTML file to fix print CSS.
+    Copy the associated _files folder to the outputs directory.
     
     Args:
-        file_path: Path to the HTML file
+        input_file_path: Path to the input HTML file
+        output_file_path: Path to the output HTML file
     """
-    print(f"Processing: {file_path}")
+    # Get the base name without extension
+    base_name = input_file_path.stem
+    input_files_dir = input_file_path.parent / f"{base_name}_files"
+    output_files_dir = output_file_path.parent / f"{base_name}_files"
+    
+    if input_files_dir.exists() and input_files_dir.is_dir():
+        if output_files_dir.exists():
+            # Remove existing output folder
+            shutil.rmtree(output_files_dir)
+        shutil.copytree(input_files_dir, output_files_dir)
+        return True
+    return False
+
+
+def process_html_file(input_file_path, output_file_path):
+    """
+    Process a single HTML file to fix print CSS and copy to outputs.
+    
+    Args:
+        input_file_path: Path to the input HTML file
+        output_file_path: Path to the output HTML file
+    """
+    print(f"Processing: {input_file_path.name}")
     
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        # Read from input file
+        with open(input_file_path, 'r', encoding='utf-8') as f:
             content = f.read()
+        
+        # Ensure output directory exists
+        output_file_path.parent.mkdir(parents=True, exist_ok=True)
         
         # Check if file already has the fix
         if 'div.sourceCode { overflow: visible !important' in content:
-            print(f"  ✓ Already fixed: {file_path.name}")
+            print(f"  ✓ Already has fix, copying to outputs: {output_file_path.name}")
+            # Still copy even if already fixed
+            with open(output_file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            if copy_files_folder(input_file_path, output_file_path):
+                print(f"  ✓ Copied {input_file_path.stem}_files/ folder")
             return False
         
         # Apply the fix
         modified_content = fix_print_css(content)
         
-        if modified_content != content:
-            # Backup original file
-            backup_path = file_path.with_suffix('.htm.bak')
-            with open(backup_path, 'w', encoding='utf-8') as f:
-                f.write(content)
-            print(f"  → Backup created: {backup_path.name}")
-            
-            # Write modified content
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(modified_content)
-            print(f"  ✓ Fixed: {file_path.name}")
-            return True
-        else:
-            print(f"  ⚠ No changes made: {file_path.name}")
-            return False
+        # Write modified content to output
+        with open(output_file_path, 'w', encoding='utf-8') as f:
+            f.write(modified_content)
+        print(f"  ✓ Fixed and saved to: {output_file_path.name}")
+        
+        # Copy associated _files folder
+        if copy_files_folder(input_file_path, output_file_path):
+            print(f"  ✓ Copied {input_file_path.stem}_files/ folder")
+        
+        return True
             
     except Exception as e:
-        print(f"  ✗ Error processing {file_path.name}: {e}")
+        print(f"  ✗ Error processing {input_file_path.name}: {e}")
         return False
 
 
@@ -116,10 +147,14 @@ def main():
     script_dir = Path(__file__).parent
     project_root = script_dir.parent
     inputs_dir = project_root / 'inputs'
+    outputs_dir = project_root / 'outputs'
     
     if not inputs_dir.exists():
         print(f"Error: Inputs directory not found: {inputs_dir}")
         return
+    
+    # Create outputs directory if it doesn't exist
+    outputs_dir.mkdir(parents=True, exist_ok=True)
     
     # Find all HTML files
     html_files = list(inputs_dir.glob('*.htm')) + list(inputs_dir.glob('*.html'))
@@ -131,12 +166,14 @@ def main():
     print(f"Found {len(html_files)} HTML file(s) to process\n")
     
     fixed_count = 0
-    for html_file in html_files:
-        if process_html_file(html_file):
+    for input_file in html_files:
+        # Create corresponding output path
+        output_file = outputs_dir / input_file.name
+        if process_html_file(input_file, output_file):
             fixed_count += 1
         print()
     
-    print(f"Summary: {fixed_count} file(s) fixed, {len(html_files) - fixed_count} file(s) unchanged")
+    print(f"Summary: {fixed_count} file(s) fixed, {len(html_files) - fixed_count} file(s) copied")
 
 
 if __name__ == '__main__':
